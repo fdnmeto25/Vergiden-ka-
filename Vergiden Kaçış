@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Vergi den Kaçış</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='20' fill='%23151518'/%3E%3Ccircle cx='50' cy='50' r='35' fill='%23ffd700'/%3E%3Ctext x='50' y='62' font-size='44' font-weight='bold' font-family='sans-serif' text-anchor='middle' fill='%23111'%3E₺%3C/text%3E%3C/svg%3E">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    }
+    #game-container {
+      width: 100%;
+      height: 100%;
+      position: relative;
+    }
+    canvas {
+      width: 100%;
+      height: 100%;
+      display: block;
+    }
+    #ui-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 20px;
+    }
+    .hud-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+    }
+    .score-box {
+      background: rgba(0, 0, 0, 0.65);
+      border: 2px solid #ffd700;
+      border-radius: 12px;
+      padding: 10px 20px;
+      color: #fff;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+    }
+    .score-title {
+      font-size: 12px;
+      text-transform: uppercase;
+      color: #aaa;
+      letter-spacing: 1px;
+    }
+    .score-value {
+      font-size: 28px;
+      font-weight: 900;
+      color: #ffd700;
+      text-shadow: 0 2px 4px rgba(0,0,0,0.8);
+    }
+    .highscore-value {
+      font-size: 18px;
+      font-weight: 700;
+      color: #00ffcc;
+    }
+    #mode-indicator {
+      align-self: center;
+      margin-top: 10px;
+      background: rgba(220, 53, 69, 0.85);
+      color: #fff;
+      padding: 8px 24px;
+      border-radius: 30px;
+      font-weight: 800;
+      font-size: 16px;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      box-shadow: 0 0 15px rgba(220, 53, 69, 0.8);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    #mode-indicator.imamoglu-mode {
+      opacity: 1;
+      background: rgba(13, 110, 253, 0.9);
+      box-shadow: 0 0 20px rgba(13, 110, 253, 0.9);
+      animation: pulse 1s infinite alternate;
+    }
+    @keyframes pulse {
+      from { transform: scale(1); }
+      to { transform: scale(1.05); }
+    }
+    #speech-bubble {
+      position: absolute;
+      bottom: 120px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #ffffff;
+      color: #000;
+      padding: 12px 24px;
+      border-radius: 20px;
+      font-size: 18px;
+      font-weight: 800;
+      border: 3px solid #000;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.4);
+      opacity: 0;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      text-align: center;
+      white-space: nowrap;
+      z-index: 10;
+    }
+    #speech-bubble::after {
+      content: '';
+      position: absolute;
+      bottom: -12px;
+      left: 50%;
+      transform: translateX(-50%);
+      border-width: 12px 12px 0;
+      border-style: solid;
+      border-color: #ffffff transparent;
+      display: block;
+      width: 0;
+    }
+    #speech-bubble.active {
+      opacity: 1;
+      transform: translateX(-50%) translateY(-10px);
+    }
+    .touch-hint {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255, 255, 255, 0.6);
+      font-size: 12px;
+      text-align: center;
+      background: rgba(0,0,0,0.5);
+      padding: 5px 10px;
+      border-radius: 10px;
+    }
+    .overlay-menu {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.85);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      pointer-events: auto;
+      backdrop-filter: blur(5px);
+    }
+    .menu-card {
+      background: #151518;
+      border: 2px solid #333;
+      border-radius: 20px;
+      padding: 30px;
+      max-width: 450px;
+      width: 90%;
+      text-align: center;
+      box-shadow: 0 20px 50px rgba(0,0,0,0.8);
+    }
+    .menu-title {
+      font-size: 32px;
+      font-weight: 900;
+      color: #e63946;
+      margin-bottom: 10px;
+      text-transform: uppercase;
+      letter-spacing: 2px;
+    }
+    .menu-subtitle {
+      color: #aaa;
+      font-size: 13px;
+      margin-bottom: 25px;
+      line-height: 1.5;
+    }
+    .btn {
+      background: linear-gradient(135deg, #e63946, #b7094c);
+      color: #fff;
+      border: none;
+      padding: 14px 30px;
+      font-size: 18px;
+      font-weight: 800;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 6px 20px rgba(230, 57, 70, 0.4);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .game-over-reason {
+      font-size: 18px;
+      color: #ff4757;
+      font-weight: 800;
+      margin-bottom: 20px;
+      background: rgba(255, 71, 87, 0.1);
+      padding: 10px;
+      border-radius: 10px;
+      border: 1px solid rgba(255, 71, 87, 0.3);
+    }
+    .score-summary {
+      display: flex;
+      justify-content: space-around;
+      margin-bottom: 25px;
+      background: #202025;
+      padding: 12px;
+      border-radius: 10px;
+    }
+    .summary-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .summary-label {
+      font-size: 11px;
+      color: #888;
+      text-transform: uppercase;
+    }
+    .summary-val {
+      font-size: 22px;
+      font-weight: 800;
+      color: #fff;
+    }
+    .hidden {
+      display: none !important;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="game-container">
+    <div id="ui-layer">
+      <div class="hud-header">
+        <div class="score-box">
+          <div class="score-title">PUAN</div>
+          <div id="score-display" class="score-value">0</div>
+        </div>
+        <div class="score-box" style="text-align: right;">
+          <div class="score-title">REKOR</div>
+          <div id="highscore-display" class="highscore-value">0</div>
+        </div>
+      </div>
+      
+      <div id="mode-indicator">EKREM İMAMOĞLU GELDİ! (10s)</div>
+      
+      <div id="speech-bubble">REPLİK BURAYA</div>
+
+      <div class="touch-hint">Ekranı Sağa/Sola Kaydır (Şerit Değiştir) | Aşağı/Yukarı Kaydır (Eğil/Zıpla)</div>
+    </div>
+
+    <div id="start-menu" class="overlay-menu">
+      <div class="menu-card">
+        <div class="menu-title">VERGİ DEN KAÇIŞ</div>
+        <div class="menu-subtitle">
+          Recep Tayyip Erdoğan arkandan kovalıyor! "+99" altınları topla.<br><br>
+          <b>Her 100 puanda</b> Ekrem İmamoğlu 10 saniyeliğine yardıma gelir ve engeller "VERGİ"ye dönüşür! Yaşlı adamlara dikkat et!
+        </div>
+        <button id="start-btn" class="btn">OYUNA BAŞLA</button>
+      </div>
+    </div>
+
+    <div id="gameover-menu" class="overlay-menu hidden">
+      <div class="menu-card">
+        <div class="menu-title" style="color: #ff4757;">YAKALANDIN!</div>
+        <div id="gameover-reason" class="game-over-reason">"Neden vergini ödemedin?!"</div>
+        
+        <div class="score-summary">
+          <div class="summary-item">
+            <span class="summary-label">SKOR</span>
+            <span id="final-score" class="summary-val">0</span>
+          </div>
+          <div class="summary-item">
+            <span class="summary-label">EN YÜKSEK</span>
+            <span id="final-highscore" class="summary-val">0</span>
+          </div>
+        </div>
+
+        <button id="restart-btn" class="btn">TEKRAR DENE</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Düzeltilmiş Three.js Kütüphane Bağlantısı -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+  <script>
+    let scene, camera, renderer;
+    let playerGroup, rteGroup, imamogluGroup;
+    let activeRunnerMesh, activeChaserMesh;
+    
+    let gameRunning = false;
+    let score = 0;
+    let highScore = localStorage.getItem('vergi_kacis_highscore') || 0;
+    let gameSpeed = 0.45;
+    const baseSpeed = 0.45;
+    let distanceTraveled = 0;
+    
+    let isImamogluMode = false;
+    let imamogluTimer = 0;
+    let nextImamogluThreshold = 100;
+    
+    const LANES = [-2.5, 0, 2.5];
+    let currentLane = 1;
+    let targetX = 0;
+    let playerY = 0;
+    let verticalVelocity = 0;
+    let isJumping = false;
+    let isDucking = false;
+    let duckTimer = 0;
+
+    let obstacles = [];
+    let collectibles = [];
+    let roadSegments = [];
+    const ROAD_SEGMENT_LENGTH = 40;
+    const TOTAL_ROAD_SEGMENTS = 6;
+
+    const scoreDisplay = document.getElementById('score-display');
+    const highscoreDisplay = document.getElementById('highscore-display');
+    const modeIndicator = document.getElementById('mode-indicator');
+    const speechBubble = document.getElementById('speech-bubble');
+    const startMenu = document.getElementById('start-menu');
+    const gameoverMenu = document.getElementById('gameover-menu');
+    const finalScoreDisplay = document.getElementById('final-score');
+    const finalHighscoreDisplay = document.getElementById('final-highscore');
+    const gameOverReason = document.getElementById('gameover-reason');
+
+    let speechTimer = null;
+
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSound(freq, duration, type = 'sine') {
+      try {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    function createTextCanvasTexture(text, bgColor, textColor, width=256, height=128) {
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      
+      ctx.fillStyle = bgColor;
+      ctx.fillRect(0, 0, width, height);
+
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(4, 4, width-8, height-8);
+
+      ctx.fillStyle = textColor;
+      ctx.font = 'bold 36px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(text, width / 2, height / 2);
+
+      return new THREE.CanvasTexture(canvas);
+    }
+
+    function createHumanoidMesh(suitColor, shirtColor, tieColor, hairColor, skinColor = 0xffdbac) {
+      const group = new THREE.Group();
+
+      const skinMat = new THREE.MeshLambertMaterial({ color: skinColor });
+      const suitMat = new THREE.MeshLambertMaterial({ color: suitColor });
+      const shirtMat = new THREE.MeshLambertMaterial({ color: shirtColor });
+      const tieMat = new THREE.MeshLambertMaterial({ color: tieColor });
+      const hairMat = new THREE.MeshLambertMaterial({ color: hairColor });
+      const shoeMat = new THREE.MeshLambertMaterial({ color: 0x111111 });
+
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.1, 0.45), suitMat);
+      torso.position.y = 1.1;
+      torso.castShadow = true;
+      group.add(torso);
+
+      const shirt = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.8, 0.05), shirtMat);
+      shirt.position.set(0, 1.25, 0.21);
+      group.add(shirt);
+
+      if (tieColor !== null) {
+        const tie = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.6, 0.06), tieMat);
+        tie.position.set(0, 1.15, 0.22);
+        group.add(tie);
+      }
+
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), skinMat);
+      head.position.y = 1.9;
+      head.castShadow = true;
+      group.add(head);
+
+      const hair = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.2, 0.54), hairMat);
+      hair.position.y = 2.18;
+      group.add(hair);
+
+      const eyeMat = new THREE.MeshBasicMaterial({ color: 0x000000 });
+      const eyeGeo = new THREE.BoxGeometry(0.08, 0.08, 0.05);
+      const leftEye = new THREE.Mesh(eyeGeo, eyeMat);
+      leftEye.position.set(-0.12, 1.95, 0.24);
+      const rightEye = new THREE.Mesh(eyeGeo, eyeMat);
+      rightEye.position.set(0.12, 1.95, 0.24);
+      group.add(leftEye, rightEye);
+
+      group.leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.9, 0.25), suitMat);
+      group.leftArm.position.set(-0.55, 1.1, 0);
+      group.rightArm = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.9, 0.25), suitMat);
+      group.rightArm.position.set(0.55, 1.1, 0);
+      
+      group.leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.9, 0.3), suitMat);
+      group.leftLeg.position.set(-0.2, 0.45, 0);
+      group.rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.9, 0.3), suitMat);
+      group.rightLeg.position.set(0.2, 0.45, 0);
+
+      const shoeGeo = new THREE.BoxGeometry(0.32, 0.15, 0.4);
+      const lShoe = new THREE.Mesh(shoeGeo, shoeMat);
+      lShoe.position.set(0, -0.4, 0.05);
+      group.leftLeg.add(lShoe);
+      const rShoe = new THREE.Mesh(shoeGeo, shoeMat);
+      rShoe.position.set(0, -0.4, 0.05);
+      group.rightLeg.add(rShoe);
+
+      group.add(group.leftArm, group.rightArm, group.leftLeg, group.rightLeg);
+      return group;
+    }
+
+    function createMainPlayer() {
+      return createHumanoidMesh(0x2b5c8f, 0xffffff, null, 0x4a2e00);
+    }
+
+    function createRTE() {
+      const rte = createHumanoidMesh(0x1c2541, 0xffffff, 0xcc0000, 0xaaaaaa);
+      rte.scale.set(1.1, 1.1, 1.1);
+      return rte;
+    }
+
+    function createImamoglu() {
+      const imamoglu = createHumanoidMesh(0x0b2545, 0xffffff, 0x00b4d8, 0x222222);
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.1, 0.08), new THREE.MeshBasicMaterial({ color: 0x000000 }));
+      frame.position.set(0, 1.95, 0.25);
+      imamoglu.add(frame);
+      imamoglu.scale.set(1.08, 1.08, 1.08);
+      return imamoglu;
+    }
+
+    function createOldManObstacle() {
+      const group = new THREE.Group();
+      const skinMat = new THREE.MeshLambertMaterial({ color: 0xffdbac });
+      const sweaterMat = new THREE.MeshLambertMaterial({ color: 0x7f5539 });
+      const pantsMat = new THREE.MeshLambertMaterial({ color: 0x4a4e69 });
+      const hairMat = new THREE.MeshLambertMaterial({ color: 0xdddddd });
+
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(0.85, 1.0, 0.5), sweaterMat);
+      torso.position.y = 1.0;
+      group.add(torso);
+
+      const head = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), skinMat);
+      head.position.y = 1.75;
+      group.add(head);
+
+      const hair = new THREE.Mesh(new THREE.BoxGeometry(0.54, 0.15, 0.54), hairMat);
+      hair.position.y = 1.9;
+      group.add(hair);
+
+      const legs = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.8, 0.35), pantsMat);
+      legs.position.y = 0.4;
+      group.add(legs);
+
+      const arm = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.6, 0.2), sweaterMat);
+      arm.position.set(0, 1.2, 0.4);
+      arm.rotation.x = -Math.PI / 3;
+      group.add(arm);
+
+      const phone = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.3, 0.04), new THREE.MeshBasicMaterial({ color: 0x111111 }));
+      phone.position.set(0, 1.25, 0.65);
+      phone.rotation.x = -Math.PI / 6;
+      group.add(phone);
+
+      group.type = 'OLD_MAN';
+      return group;
+    }
+
+    function initScene() {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x87ceeb);
+      scene.fog = new THREE.FogExp2(0x87ceeb, 0.015);
+
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      document.getElementById('game-container').appendChild(renderer.domElement);
+
+      scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      dirLight.position.set(20, 40, 20);
+      dirLight.castShadow = true;
+      scene.add(dirLight);
+
+      for (let i = 0; i < TOTAL_ROAD_SEGMENTS; i++) {
+        spawnRoadSegment(-i * ROAD_SEGMENT_LENGTH);
+      }
+
+      playerGroup = createMainPlayer();
+      scene.add(playerGroup);
+
+      rteGroup = createRTE();
+      scene.add(rteGroup);
+
+      imamogluGroup = createImamoglu();
+      imamogluGroup.visible = false;
+      scene.add(imamogluGroup);
+
+      camera.position.set(0, 5, 7);
+      camera.lookAt(0, 2, -5);
+
+      window.addEventListener('resize', onWindowResize);
+    }
+
+    function spawnRoadSegment(zPos) {
+      const segment = new THREE.Group();
+      segment.position.z = zPos;
+
+      const road = new THREE.Mesh(new THREE.PlaneGeometry(10, ROAD_SEGMENT_LENGTH), new THREE.MeshLambertMaterial({ color: 0x333333 }));
+      road.rotation.x = -Math.PI / 2;
+      segment.add(road);
+
+      const lineMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const leftLine = new THREE.Mesh(new THREE.PlaneGeometry(0.2, ROAD_SEGMENT_LENGTH), lineMat);
+      leftLine.rotation.x = -Math.PI / 2;
+      leftLine.position.set(-1.25, 0.01, 0);
+      segment.add(leftLine);
+
+      const rightLine = new THREE.Mesh(new THREE.PlaneGeometry(0.2, ROAD_SEGMENT_LENGTH), lineMat);
+      rightLine.rotation.x = -Math.PI / 2;
+      rightLine.position.set(1.25, 0.01, 0);
+      segment.add(rightLine);
+
+      scene.add(segment);
+      roadSegments.push(segment);
+    }
+
+    const vergiTexture = createTextCanvasTexture('VERGİ', '#d90429', '#ffffff');
+    const standardObstacleTexture = createTextCanvasTexture('DUR', '#ffb703', '#000000');
+
+    function spawnObstacleCluster(zPos) {
+      const laneIdx = Math.floor(Math.random() * 3);
+      const laneX = LANES[laneIdx];
+      const typeRand = Math.random();
+
+      if (typeRand < 0.4) {
+        const barrierGroup = new THREE.Group();
+        const isHigh = Math.random() > 0.5;
+        const width = 2.2;
+        const height = isHigh ? 1.2 : 2.2;
+        const yPos = isHigh ? 0.6 : 1.1;
+
+        const barrier = new THREE.Mesh(new THREE.BoxGeometry(width, height, 0.4), new THREE.MeshLambertMaterial({ map: isImamogluMode ? vergiTexture : standardObstacleTexture }));
+        barrier.position.set(laneX, yPos + (isHigh ? 0 : 0.4), zPos);
+        
+        barrierGroup.add(barrier);
+        barrierGroup.type = 'BARRIER';
+        barrierGroup.isHigh = isHigh;
+        barrierGroup.meshRef = barrier;
+
+        scene.add(barrierGroup);
+        obstacles.push(barrierGroup);
+      } else if (typeRand < 0.75) {
+        const oldMan = createOldManObstacle();
+        oldMan.position.set(laneX, 0, zPos);
+        scene.add(oldMan);
+        obstacles.push(oldMan);
+      } else {
+        const wall = new THREE.Mesh(new THREE.BoxGeometry(2.2, 3.5, 0.8), new THREE.MeshLambertMaterial({ map: isImamogluMode ? vergiTexture : standardObstacleTexture }));
+        wall.position.set(laneX, 1.75, zPos);
+        wall.type = 'WALL';
+        scene.add(wall);
+        obstacles.push(wall);
+      }
+
+      for (let l = 0; l < 3; l++) {
+        if (l !== laneIdx && Math.random() > 0.4) {
+          spawnScoreCoin(LANES[l], zPos);
+        }
+      }
+    }
+
+    function spawnScoreCoin(x, z) {
+      const coinGroup = new THREE.Group();
+      const coin = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 0.1, 16), new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.8, roughness: 0.2 }));
+      coin.rotation.x = Math.PI / 2;
+      coinGroup.add(coin);
+
+      const textPlane = new THREE.Mesh(new THREE.PlaneGeo
